@@ -37,6 +37,8 @@ from mcp_client import Client
 
 # Fixed chrome cleanup operation: remove only context IDs returned by this test.
 def close_test_tabs(ids):
+    # A failed navigation must never turn an original tab into a cleanup target.
+    ids = [context for context in ids if f'bc:{context}' not in (originals or {})]
     if not ids:
         return
     sock = socket.create_connection((os.environ.get('FF_RDP_HOST', '127.0.0.1'), int(os.environ.get('FF_RDP_PORT', '6000'))), 5)
@@ -81,6 +83,7 @@ threading.Thread(target=server.serve_forever, daemon=True).start()
 url = f'http://127.0.0.1:{server.server_port}/'
 c = Client(sys.argv[1:] or ['./result/bin/firefox-rdp-mcp'])
 created = []
+originals = None
 try:
     baseline, _ = c.call('firefox_status')
     originals = {t['tab']:t['url'] for t in baseline['tabs']}
@@ -150,7 +153,9 @@ try:
 finally:
     try:
         status, _ = c.call('firefox_status')
-        created += [int(t['tab'].removeprefix('bc:')) for t in status['tabs'] if t['url'].startswith(url)]
+        if originals is not None:
+            created += [int(t['tab'].removeprefix('bc:')) for t in status['tabs']
+                        if t['url'].startswith(url) and t['tab'] not in originals]
     except Exception:
         pass
     close_test_tabs(created)
