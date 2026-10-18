@@ -11,11 +11,23 @@ try:
     assert client.info['result']['serverInfo']['name'] == 'firefox-rdp-mcp'
     tools = client.request('tools/list', {})['result']['tools']
     names = {tool['name'] for tool in tools}
-    assert len(names) == len(tools) == 24, names
+    assert len(names) == len(tools) == 26, names
     assert {'firefox_status', 'firefox_navigate', 'firefox_wait', 'firefox_extract',
-            'firefox_discover_lists', 'firefox_screenshot'} <= names
+            'firefox_discover_lists', 'firefox_screenshot', 'firefox_close_page', 'firefox_find_elements'} <= names
     for tool in tools:
         assert 'timeout_ms' in tool['inputSchema']['properties'], tool['name']
+    schemas = {t['name']:t['inputSchema'] for t in tools}
+    assert 'tab' in schemas['firefox_close_page']['required']
+    assert 'name' in schemas['firefox_find_elements']['required']
+    assert 'expect' in schemas['firefox_click']['properties']
+    assert 'condition' in schemas['firefox_wait']['properties']
+    client.call('firefox_close_page', {}, error=True)
+    client.call('firefox_close_page', {'tab':'example.com'}, error=True)
+    client.call('firefox_find_elements', {'name':''}, error=True)
+    client.call('firefox_snapshot', {'format':'invalid'}, error=True)
+    client.call('firefox_click', {'ref':'e1', 'selector':'button'}, error=True)
+    client.call('firefox_click', {'ref':'e1', 'expect':{'state':'invalid'}}, error=True)
+    client.call('firefox_wait', {'condition':{'state':'text_changed'}}, error=True)
     # Invalid inputs are rejected before contacting Firefox.
     client.call('firefox_navigate', {'url': 'javascript:alert(1)'}, error=True)
     client.call('firefox_wait', {'ready': 'invalid'}, error=True)

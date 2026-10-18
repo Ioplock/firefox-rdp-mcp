@@ -9,9 +9,9 @@ installation, configuration or verification changes.
 ## Build and verify
 
 - Build sequentially: `nix build --cores 2 --max-jobs 1`.
-- Run `nix flake check --cores 2 --max-jobs 1`: Rust tests, formatting and an
-  offline stdio protocol check. These must not require a browser or network.
-- `nix develop` supplies cargo/rustc/rustfmt/clippy, Python and the pinned
+- Run `nix flake check --cores 2 --max-jobs 1`: Rust tests, formatting, fixed
+  page-script tests and an offline stdio protocol check. These must not require a browser or network.
+- `nix develop` supplies cargo/rustc/rustfmt/clippy, Python, Node.js and the pinned
   patched backend. Run `cargo fmt --check` and `cargo test --locked -j 2` as needed.
 - Live tests are opt-in: `python3 tests/browser_smoke.py ./result/bin/firefox-rdp-mcp`.
   They use the existing local Firefox at FF_RDP_HOST/FF_RDP_PORT, default
@@ -41,8 +41,14 @@ installation, configuration or verification changes.
 ## Suggested consumer-agent instructions
 
 Call firefox_status first; prefer bc:ID handles and snapshot refs. Use
-firefox_discover_lists / firefox_extract for repeated cards, queries for text,
-and pagination after truncation. When an action returns partial or times out,
-inspect/wait before deciding whether another action is needed. Leave requested
-result tabs open. The user may change Firefox at any time: refresh the snapshot
-before interacting with a page they have changed.
+firefox_find_elements for role/name lookup; inspect all matches before choosing
+a ref. Compact snapshots prioritize dialogs/content; format=tree retains the
+backend tree. Use firefox_discover_lists extraction examples / firefox_extract
+for repeated cards, queries for text, and pagination after truncation. Close
+authorized tabs with firefox_close_page and an explicit bc:ID. When an action
+returns partial or times out, inspect/wait before deciding whether another
+action is needed; target_missing requires a current tab selection, not reload.
+Use expect/condition to observe changes, and verify application state before
+claiming success: a click alone is not proof. Leave requested result tabs open.
+The user may change Firefox at any time: refresh the snapshot before interacting
+with a page they have changed.

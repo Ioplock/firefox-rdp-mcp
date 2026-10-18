@@ -19,8 +19,8 @@ class Fixture(http.server.BaseHTTPRequestHandler):
         else:
             rows = ''.join(f'<li><a href="/item/{i}?keep=yes">Item {i}</a><span> Price {i} </span></li>' for i in range(30))
             data = (f'<html><head><title>MCP regression fixture</title></head><body><h1>Ready</h1>'
-                    f'<input id="input"><button id="button" onclick="this.textContent=\'Clicked\'">Click</button>'
-                    f'<ul>{rows}</ul><img src="/slow?{time.time_ns()}"></body></html>').encode()
+                    f'<header><button>Chrome action</button></header><main><label for="input">Search term</label><input id="input"><button id="button" onclick="this.textContent=\'Clicked\'">Click</button>'
+                    f'<button class="duplicate">Duplicate</button><button class="duplicate">Duplicate</button><button hidden>Hidden action</button><ul>{rows}</ul></main><img src="/slow?{time.time_ns()}"></body></html>').encode()
             kind = 'text/html'
         self.send_response(200)
         self.send_header('Content-Type', kind)
@@ -100,7 +100,25 @@ try:
     assert data['results']['next_offset']==5 and data['results']['has_more'], data
     assert '?keep=yes' in data['results']['rows'][0]['url'], data
     data, _ = c.call('firefox_discover_lists')
-    assert any(x['count']==30 for x in data['lists']), data
+    recipe = next(x['extract_example'] for x in data['lists'] if x['count']==30)
+    data, _ = c.call('firefox_extract', recipe)
+    assert data['results']['rows'][0]['title']=='Item 0', data
+    data, _ = c.call('firefox_snapshot', {'limit':2})
+    assert data['elements'][0]['zone']=='content', data
+    assert data['has_more'] and data['next_offset']==2, data
+    data, _ = c.call('firefox_find_elements', {'role':'button','name':'Duplicate'})
+    assert data['total']==2 and len(data['elements'])==2, data
+    assert all(x['ref'].startswith('e') for x in data['elements'])
+    data, _ = c.call('firefox_find_elements', {'role':'button','name':'Hidden action'})
+    assert data['total']==0, data
+    data, _ = c.call('firefox_find_elements', {'role':'textbox','name':'Search term'})
+    assert data['total']==1, data
+    c.call('firefox_type', {'ref':data['elements'][0]['ref'],'text':'observed', 'with_page':False,
+                          'expect':{'selector':'#input','state':'text_changed'}})
+    response, _ = c.call('firefox_click', {'selector':"button:contains('Click')"}, error=True)
+    assert response['error']['code']==-32602, response
+    data, _ = c.call('firefox_snapshot', {'format':'tree','query':'Click'})
+    assert data.get('results') is not None, data
     data, _ = c.call('firefox_select_page', {'target':'MCP regression fixture'})
     assert data['selected']==key, data
     # Duplicate URLs and titles must still be independently addressable.
@@ -110,7 +128,11 @@ try:
     created.append(int(duplicate_key.removeprefix('bc:')))
     c.call('firefox_select_page', {'target':'MCP regression fixture'}, error=True)
     c.call('firefox_evaluate', {'tab':key,'expression':'location.href'})
-    close_test_tabs([int(duplicate_key.removeprefix('bc:'))])
+    data, _ = c.call('firefox_close_page', {'tab':duplicate_key})
+    assert data['closed'] and data['selected']!=duplicate_key, data
+    assert any(t['tab']==key for t in data['tabs']), data
+    response, _ = c.call('firefox_evaluate', {'tab':duplicate_key,'expression':'location.href'}, error=True)
+    assert response['error']['data']['status']=='target_missing', response
     c.call('firefox_select_page', {'target':key})
     _, elapsed = c.call('firefox_wait', {'selector':'#missing','timeout_ms':500}, error=True)
     assert elapsed < 2, elapsed
@@ -121,7 +143,17 @@ try:
     assert data['results']['readiness']['state']['ready']=='complete', data
     assert elapsed >= 3, elapsed
     c.call('firefox_type', {'selector':'#input','text':'test','with_page':False})
-    c.call('firefox_click', {'selector':'#button','with_page':False})
+    data, _ = c.call('firefox_find_elements', {'role':'button','name':'Click'})
+    assert data['total']==1, data
+    data, _ = c.call('firefox_click', {'ref':data['elements'][0]['ref'],'with_page':False,
+                                      'expect':{'selector':'#button','state':'text_changed'}})
+    assert data['postcondition']['confirmed'], data
+    data, _ = c.call('firefox_wait', {'condition':{'selector':'#button','state':'text_contains','text':'Clicked'}})
+    assert data['confirmed'], data
+    data, _ = c.call('firefox_wait', {'condition':{'selector':'#missing','state':'disappeared'}})
+    assert data['confirmed'], data
+    data, _ = c.call('firefox_wait', {'condition':{'selector':'#button','state':'text_contains','text':'Never appears'}})
+    assert not data['confirmed'] and data['status']=='pending', data
     data, _ = c.call('firefox_evaluate', {'expression':'document.querySelector("#button").textContent'})
     assert data['results']=='Clicked', data
     _, elapsed = c.call('firefox_evaluate', {'expression':'new Promise(()=>{})','timeout_ms':500}, error=True)

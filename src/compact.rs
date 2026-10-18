@@ -36,49 +36,6 @@ pub fn strip_dom(v: &mut Value) {
     }
 }
 
-/// Cap `results.page.excerpt` at `max` chars (char-boundary safe).
-/// Marks `excerpt_truncated: true` when cut.
-pub fn cap_excerpt(envelope: &mut Value, max: usize) {
-    let Some(page) = envelope.get_mut("results").and_then(|r| r.get_mut("page")) else {
-        return;
-    };
-    let Some(excerpt) = page.get("excerpt").and_then(|e| e.as_str()) else {
-        return;
-    };
-    if excerpt.chars().count() <= max {
-        return;
-    }
-    let cut: usize = excerpt
-        .char_indices()
-        .take(max)
-        .last()
-        .map(|(i, c)| i + c.len_utf8())
-        .unwrap_or(0);
-    page["excerpt"] = Value::String(format!(
-        "{}…[truncated — use firefox_page_text with query for more]",
-        &excerpt[..cut]
-    ));
-    page["excerpt_truncated"] = Value::Bool(true);
-}
-
-/// Drop `links` arrays inside `results.page.facts` (breadcrumb/microdata
-/// rows). The same targets already appear as interactive refs, and the
-/// hrefs carry session-long query blobs.
-pub fn strip_fact_links(envelope: &mut Value) {
-    let Some(facts) = envelope
-        .get_mut("results")
-        .and_then(|r| r.get_mut("page"))
-        .and_then(|p| p.get_mut("facts"))
-        .and_then(|f| f.as_array_mut())
-    else {
-        return;
-    };
-    for fact in facts {
-        if let Some(map) = fact.as_object_mut() {
-            map.remove("links");
-        }
-    }
-}
 /// Browser context identities survive reconnects; actor strings do not.
 pub fn tab_contexts(tabs: &Value) -> Vec<u64> {
     tabs["results"]

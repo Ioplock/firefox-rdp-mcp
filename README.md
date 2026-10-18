@@ -149,7 +149,7 @@ Upstream documentation: [Firefox command-line options](https://firefox-source-do
 
 ## Tools and behavior
 
-24 tools cover status/tabs, snapshots, text, navigation, click/type/scroll/history,
+26 tools cover status/tabs, snapshots, text, navigation, click/type/scroll/history,
 evaluation, console/network, screenshots, storage/cookies, styles/sources,
 performance, readiness waits and list discovery/extraction.
 
@@ -169,6 +169,63 @@ performance, readiness waits and list discovery/extraction.
   queries, `firefox_discover_lists`, and `firefox_extract` pagination (`offset`,
   `next_offset`, `has_more`) for large pages. A field's `max` limits text/attributes,
   while hrefs retain their full navigable URL.
+
+### Agent-friendly interactions
+
+- `firefox_close_page` requires an explicit `{"tab":"bc:58"}`. It closes only that
+  tab, reports `closed`, remaining `tabs`, and the MCP default `selected` target.
+  `closed:false` means closure was not observed (for example a page may request
+  confirmation); inspect before retrying. Closing the default target selects a
+  surviving target. Only close tabs the user authorized closing.
+- `firefox_find_elements` accepts `role`, required `name`, and `exact` (default
+  true; false enables case-insensitive substring matching). It returns all
+  matches with refs, `total`, `offset`, `next_offset`, `has_more`, and `omitted`.
+  Use a returned ref with click/type; never assume the first of multiple matches
+  is correct. Labels and names are derived from the DOM, not a complete platform
+  accessibility implementation. Hidden/inert elements are excluded; disabled
+  controls are reported. This operates in the main document; frame/shadow content
+  may require the backend tree or other inspection.
+- `firefox_snapshot` now defaults to `format:"compact"`: a flat list of
+  interactive elements, with dialogs and main content before header/footer links.
+  It supports `query`, `offset`, `limit`, and `max_chars`. `format:"tree"` retains
+  the previous backend tree and its `depth` option. Names longer than 500 characters
+  are marked `name_truncated`; matching uses the full name. URLs/refs stay complete.
+  Navigation and click/type page views also use this compact format. Consumers
+  reading the previous nested page tree should request `format:"tree"` separately.
+- Navigation readiness returns `status:ready|pending|target_missing|read_failed`.
+  A lost target includes current tabs when available; select a current `bc:ID`.
+  `pending` calls for `firefox_wait`, not reload/repeated navigation. A missing
+  target before an action is an invalid-parameters error with recovery data.
+  Targets are never silently replaced by another tab with a similar URL.
+- Standard CSS is validated before click/type, scroll, extraction and waits.
+  Invalid selectors such as `button:contains(...)` return an argument error,
+  rather than a misleading element timeout. Use role/name lookup instead.
+- `firefox_discover_lists` includes an `extract_example` with field selectors
+  ready to pass to `firefox_extract`. `price_candidate` is only a heuristic:
+  verify units, discounts and availability from the returned text.
+- Click/type accept an optional `expect` condition. Conditions use `selector`
+  (body by default), `state` (`appeared`, `disappeared`, `text_contains`, or
+  `text_changed`), and `text` for `text_contains`. Appearance means DOM presence.
+  Text observations use the control value for inputs and visible text otherwise.
+  `text_changed` compares against the value observed before the action.
+  `postcondition.confirmed` reports the evidence independently of action dispatch.
+  An unmet condition returns `pending`; a read failure or lost target is explicit.
+  An action without a condition does not confirm the application's outcome.
+- `firefox_wait` accepts the same `condition`; `text_changed` additionally requires
+  `previous_text`. Condition polling lasts at most five seconds, bounded by the
+  overall tool deadline. Inspect or wait again if unconfirmed; do not repeat a
+  mutation blindly. Verify the actual cart/form/application state before claiming
+  completion. A text match alone is not proof that a purchase or submission succeeded.
+
+```json
+{"role":"button","name":"В корзину","exact":true}
+```
+
+Pass that to `firefox_find_elements`, then use a unique returned ref:
+
+```json
+{"ref":"e583016","expect":{"selector":"#cart-count","state":"text_changed"}}
+```
 
 | Environment variable | Default | Purpose |
 |---|---|---|
@@ -190,8 +247,9 @@ cargo test --locked -j 2
 nix flake check --cores 2 --max-jobs 1
 ```
 
-`flake check` runs Rust tests (including process termination), formatting and an
-offline MCP protocol/schema test. No browser is required. `tests/mcp_client.py`
+`flake check` runs Rust tests (including process termination), formatting, fixed
+page-script unit fixtures in Node.js, and an offline MCP protocol/schema test.
+No browser is required. `tests/mcp_client.py`
 uses only the Python standard library.
 
 With the existing local shared Firefox running, explicitly opt into live tests:

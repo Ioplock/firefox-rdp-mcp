@@ -1,7 +1,7 @@
 //! firefox-rdp-mcp: MCP (stdio) server driving a shared Firefox via `ff-rdp`.
 //!
-//! The server is a thin typed wrapper: each tool runs
-//! `ff-rdp --format json <subcommand>` against the DevTools RDP endpoint
+//! Page tools use `ff-rdp --format json <subcommand>`; fixed browser-chrome
+//! operations use the same DevTools RDP endpoint directly
 //! (default 127.0.0.1:6000, the `agent-firefox` instance) and returns the
 //! structured JSON envelope. Configure with:
 //!   FF_RDP_BIN     path to ff-rdp (default: ff-rdp on PATH)

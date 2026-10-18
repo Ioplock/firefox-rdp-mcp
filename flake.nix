@@ -27,7 +27,7 @@
           meta.description = "Connect an MCP client to an existing Firefox RDP session";
         };
         devShells.default = pkgs.mkShell {
-          packages = with pkgs; [ cargo rustc rustfmt clippy python3 ff-rdp ];
+          packages = with pkgs; [ cargo rustc rustfmt clippy python3 nodejs ff-rdp ];
           FF_RDP_BIN = "${pkgs.ff-rdp}/bin/ff-rdp";
         };
         checks = {
@@ -39,6 +39,10 @@
           protocol = pkgs.runCommand "firefox-rdp-mcp-protocol" { nativeBuildInputs = [ pkgs.python3 ]; } ''
             export PYTHONDONTWRITEBYTECODE=1
             python ${./tests}/protocol_test.py ${pkgs.lib.getExe pkgs.firefox-rdp-mcp}
+            touch $out
+          '';
+          scripts = pkgs.runCommand "firefox-rdp-mcp-scripts" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
+            node ${./tests}/scripts_test.js ${./src/scripts}
             touch $out
           '';
         };
