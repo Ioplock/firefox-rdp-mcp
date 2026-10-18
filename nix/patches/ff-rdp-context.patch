@@ -1,0 +1,14 @@
+--- a/src/tab_target.rs
++++ b/src/tab_target.rs
+@@ -46,6 +46,11 @@
+     }
+ 
+     if let Some(selector) = tab {
++        if let Some(id) = selector.strip_prefix("bc:") {
++            let id = id.parse::<u64>().map_err(|_| AppError::User("invalid browsing context ID".into()))?;
++            return tabs.iter().find(|t| t.browsing_context_id == Some(id))
++                .ok_or_else(|| AppError::User(format!("browsing context {id} no longer exists; list tabs")));
++        }
+         // Try 1-based integer index first.
+         if let Ok(n) = selector.parse::<usize>() {
+             let count = tabs.len();

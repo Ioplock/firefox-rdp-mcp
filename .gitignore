@@ -1,0 +1,7 @@
+/target/
+/result
+/result-*
+/.state/
+.env
+__pycache__/
+*.py[cod]

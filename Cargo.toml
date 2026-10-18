@@ -1,0 +1,24 @@
+[package]
+name = "firefox-rdp-mcp"
+version = "0.2.0"
+edition = "2021"
+description = "MCP server exposing a shared Firefox instance via ff-rdp (DevTools RDP)"
+license = "MIT"
+repository = "https://github.com/Ioplock/firefox-rdp-mcp"
+readme = "README.md"
+
+[[bin]]
+name = "firefox-rdp-mcp"
+path = "src/main.rs"
+
+[dependencies]
+# Official Rust SDK for Model Context Protocol (pinned, see flake.lock / Cargo.lock).
+rmcp = { version = "=3.5.1", features = ["server", "transport-io", "macros", "schemars"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "fs", "time", "net", "io-util"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+anyhow = "1"
+base64 = "0.22"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
